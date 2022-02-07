@@ -1,3 +1,4 @@
+import cv
 import numpy as np
 import pickle
 import time
@@ -109,42 +110,48 @@ def SampleCameraPath():
     K = camera_objs[2]
     ForegroundPointCloudRGB = camera_objs[3]
     BackgroundPointCloudRGB = camera_objs[4]
-    print(K)
-    print(ForegroundPointCloudRGB)
-    print(ForegroundPointCloudRGB.shape)
+
     # create variables for computation
     data3DC = (BackgroundPointCloudRGB,ForegroundPointCloudRGB)
     R = np.identity(3)
-    move = np.array([0, 0, -0.25]).reshape((3,1))
+    move = np.array([0, 0, -0.4]).reshape((3,1))# need to modif
 
-    f = 4
-    # for step in range(8):
-    #     tic = time.time()
+    init_z = 6;# camera distance
+    rx = init_z / K[1][1];
+    ry = init_z / K[0][0];
+
+    for step in range(8):
+        tic = time.time()
         
-    #     fname = "SampleOutput{}.jpg".format(step)
-    #     print("\nGenerating {}".format(fname))
-    #     t = step*move
+        fname = "SampleOutput{}.jpg".format(step)
+        print("\nGenerating {}".format(fname))
+        t = step*move
+        M = np.matmul(K,(np.hstack((R,t))))
 
+        z = 6+t[2];
 
-    #     M = np.matmul(K,(np.hstack((R,t))))
-    #     print(M)
+        fx = z / rx;
+        fy = z / ry;
+        K[1][1] = fx;
+        K[0][0] = fy;
 
-    #     img = PointCloud2Image(M,data3DC,crop_region,filter_size)
+        img = PointCloud2Image(M,data3DC,crop_region,filter_size)
 
-    #     # Convert image values form (0-1) to (0-255) and cahnge type from float64 to float32
-    #     img = 255*(np.array(img, dtype=np.float32))
+        # Convert image values form (0-1) to (0-255) and cahnge type from float64 to float32
+        img = 255*(np.array(img, dtype=np.float32))
 
-    #     # convert image from RGB to BGR for OpenCV
-    #     img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        # convert image from RGB to BGR for OpenCV
+        img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-    #     # write image to file 'fname'
-    #     cv2.imwrite(fname,img_bgr)
+        # write image to file 'fname'
+        cv2.imwrite(fname, img_bgr)
 
-    #     toc = time.time()
-    #     toc = toc-tic
-    #     print("{0:.4g} s".format(toc))
+        toc = time.time()
+        toc = toc-tic
+        print("{0:.4g} s".format(toc))
 
 def main():
+
     SampleCameraPath()
 
 if __name__ == "__main__":
