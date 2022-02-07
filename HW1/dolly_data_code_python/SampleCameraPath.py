@@ -1,4 +1,3 @@
-import cv
 import numpy as np
 import pickle
 import time
@@ -110,30 +109,30 @@ def SampleCameraPath():
     K = camera_objs[2]
     ForegroundPointCloudRGB = camera_objs[3]
     BackgroundPointCloudRGB = camera_objs[4]
-
+    # print(K)
+    # print(ForegroundPointCloudRGB)
+    # print(ForegroundPointCloudRGB.shape)
     # create variables for computation
     data3DC = (BackgroundPointCloudRGB,ForegroundPointCloudRGB)
     R = np.identity(3)
-    move = np.array([0, 0, -0.4]).reshape((3,1))# need to modif
+    move = np.array([0, 0, -0.5]).reshape((3,1))
+    # move = np.array([0, 0, -0.25]).reshape((3,1))
 
-    init_z = 6;# camera distance
-    rx = init_z / K[1][1];
-    ry = init_z / K[0][0];
-
+    z = 3.4
+    zx = K[0,0]/z
+    zy = K[1,1]/z
     for step in range(8):
         tic = time.time()
         
         fname = "SampleOutput{}.jpg".format(step)
         print("\nGenerating {}".format(fname))
         t = step*move
+        f = z + t[2]
+        K[0,0] = f*zx
+        K[1,1] = f*zy
+
         M = np.matmul(K,(np.hstack((R,t))))
-
-        z = 6+t[2];
-
-        fx = z / rx;
-        fy = z / ry;
-        K[1][1] = fx;
-        K[0][0] = fy;
+        print(M)
 
         img = PointCloud2Image(M,data3DC,crop_region,filter_size)
 
@@ -144,14 +143,13 @@ def SampleCameraPath():
         img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
         # write image to file 'fname'
-        cv2.imwrite(fname, img_bgr)
+        cv2.imwrite(fname,img_bgr)
 
         toc = time.time()
         toc = toc-tic
         print("{0:.4g} s".format(toc))
 
 def main():
-
     SampleCameraPath()
 
 if __name__ == "__main__":
