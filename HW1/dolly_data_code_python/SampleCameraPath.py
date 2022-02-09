@@ -15,8 +15,8 @@ def PointCloud2Image(M,Sets3DRGB,viewport,filter_size):
     h = viewport[2]
     w = viewport[3]
     bot = top  + h + 1
-    right = left + w +1;
-    output_image = np.zeros((h+1,w+1,3));    
+    right = left + w + 1
+    output_image = np.zeros((h+1,w+1,3))   
 
     for counter in range(len(Sets3DRGB)):
         print("...Projecting point cloud into image plane...")
@@ -108,9 +108,6 @@ def SampleCameraPath():
     K = camera_objs[2]
     ForegroundPointCloudRGB = camera_objs[3]
     BackgroundPointCloudRGB = camera_objs[4]
-    # print(K)
-    # print(ForegroundPointCloudRGB)
-    # print(ForegroundPointCloudRGB.shape)
     # create variables for computation
     data3DC = (BackgroundPointCloudRGB,ForegroundPointCloudRGB)
     R = np.identity(3)
@@ -131,7 +128,6 @@ def SampleCameraPath():
         print("\nGenerating {}".format(fname))
         t = step*move
         
-        # print(t[0],t[1],t[2])
         f = z + t[2]
         K[0,0] = f*zx
         K[1,1] = f*zy
@@ -140,7 +136,6 @@ def SampleCameraPath():
         t[2] = t[2] - 1.44
 
         M = np.matmul(K,(np.hstack((R,t))))
-        # print(M)
 
         img = PointCloud2Image(M,data3DC,crop_region,filter_size)
 
