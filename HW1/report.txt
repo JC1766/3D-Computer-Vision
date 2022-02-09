@@ -1,0 +1,274 @@
+CS532 Homework 1
+Part 1: Apply Normalized DLT algorithm for homography estimation and use binlinear interpolation for rendering output image.
+
+To start off, we first choose four points on the original baskeball court image to select only the playing court itself, which we know is a rectangle shape.
+# [23,193] -> [0,0] 
+# [247,51] -> [939,0] 
+# [402,74] -> [939,499] 
+# [279,279] -> [0,499]
+We want to map the court to a 940*500 canvas to portray a topdown view of the basketball court, and to do that we use the DLT algorithm to obtain the homography matrix which we then inversed as we will be using reverse warping. For each pixel in the new canvas, the corresponding pixel location is obtained using the homography matrix and if the location is between pixels, we use bilinear interpolation to sample the color of each surrounding pixel. The resulting image will give us a topdown view of the basketball court area that we selected from the original image.
+
+
+Part 2: Design a sequence of projection matrices corresponding to each frame of a "dolly zoom" capture sequence and effect.
+
+The Dolly Zoom effect is obtained by adjusting the zoom angle of the camera in the opposite direction while moving the camera position forward or backwards. Our starting point, or origin in the image is around 4 meters from the foreground object, which displays it in a 250*400 box. To display the foreground object in a 400*640 box instead, we have to move the camera position forward by 1.44 meters obtained from the ratio 8/5 * the length of projection 9 meters. As for the zoom adjustment in each step to maintain the size of the foreground object while moving forward or backwards, we have to change the values of rx and ry in the internal calibration matrix K using the formula y = f*Y/Z where Y, Z are the initial values of [rx or ry] and [distance] respectively and y, f are the current values. The starting position of the image is now 1.44m away from the origin, so for the first video we zoom in while moving backwards from the object to return to the origin, with each step being 0.0192m obtained from 1.44 distance / 75 frames. The second video simply performs the zoom in the other direction.
+
+
+from types import new_class
+import numpy as np
+import sys
+import cv2
+from PIL import Image
+
+def normalize(width,height):
+    normMat = np.array([[width+height,0,width/2],[0,width+height,height/2],[0,0,1]])
+    Tn = np.linalg.inv(normMat)
+    return Tn
+
+
+def computeA(source, target):
+    [a,b,c] = source
+    [x,y,z] = target
+    matrixA = np.array([[0,0,0,-a,-b,-c,y*a,y*b,y*c],[a,b,c,0,0,0,-x*a,-x*b,-x*c]])
+    return matrixA
+
+def imageWarp(original, new, H):
+    (h,w,_) = new.shape
+    for i in range(0,w):
+        for j in range(0,h):
+            coord = [i,j,1]
+            # getting the warped coordinates
+            res = np.matmul(H, coord)
+            # converting homogeneous coordinates back to regular inhomogeneous coords
+            x = res[0]/res[2]
+            y = res[1]/res[2]
+            # split the coords to get values before and after the decimal for color sampling
+            xsplit = str(x).split('.')
+            ysplit = str(y).split('.')
+            i_whole = int(ysplit[0])
+            j_whole = int(xsplit[0])
+            i_dec = float('0.'+ysplit[1])
+            j_dec = float('0.'+xsplit[1])
+
+            # if the warped point is close enough to actual point just sample the point,
+            # otherwise use binlinear interpolation to get the rgb values
+            if(i_dec+j_dec <= 0.01):
+                new[j][i] = original[i_whole][j_whole]
+            else:
+                rgb = [0,0,0]
+                for k in range(0,3):
+                    res = (1-i_dec)*(1-j_dec)*original[i_whole][j_whole][k] + (i_dec)*(1-j_dec)*original[i_whole+1][j_whole][k] \
+                    + (i_dec)*(j_dec)*original[i_whole+1][j_whole-1][k] + (1-i_dec)*(j_dec)*original[i_whole][j_whole-1][k]
+                    rgb[k] = int(res)
+                new[j][i] = rgb
+    newImg = Image.fromarray(new)
+    return newImg
+
+
+def main():
+    image = Image.open("basketball-court.ppm")
+    newImg = Image.new(mode = "RGB", size = (940, 500))
+    # [23,193] -> [0,0] 
+    # [247,51] -> [939,0] 
+    # [402,74] -> [939,499] 
+    # [279,279] -> [0,499]
+    arr1 = [[23,193,1],[247,51,1],[402,74,1],[279,279,1]]
+    arr2 = [[0,0,1],[939,0,1],[939,499,1],[0,499,1]]
+    T1 = normalize(488,366)
+    T2 = normalize(940,500)
+
+    # normalize arr2 and arr2
+    for i in range(0,4):
+        arr1[i] = np.matmul(T1,arr1[i])
+        arr2[i] = np.matmul(T2,arr2[i])
+
+    # compute A matrix
+    A = np.zeros((8,9))
+    for i in range(0,4):
+        Ai = computeA(arr1[i],arr2[i])
+        it = 2*i
+        A[it:it+2] = Ai
+        i+=1
+
+    # compute svd and take smallest eigenvector
+    U, D, VT = np.linalg.svd(A)
+    H = VT[8]
+    # reshape into 3*3 homography matrix
+    H = np.reshape(H,(3,3))
+
+    # Denormalize H 
+    H = np.matmul(np.matmul(np.linalg.pinv(T2),H),T1)
+
+    # we take the inverse homography matrix since we are doing reverse warping
+    H = np.linalg.inv(H)
+
+    newImg = imageWarp(np.array(image),np.array(newImg),H)
+    newImg.show()
+    newImg.save("topDownBasketballCourt.jpg")
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+import numpy as np
+import pickle
+import time
+import sys
+import cv2
+from scipy.signal import medfilt
+from scipy.ndimage.filters import maximum_filter as maxfilt
+
+def PointCloud2Image(M,Sets3DRGB,viewport,filter_size):
+
+    # setting yp output image
+    print("...Initializing 2D image...")
+    top = viewport[0]
+    left = viewport[1]
+    h = viewport[2]
+    w = viewport[3]
+    bot = top  + h + 1
+    right = left + w + 1
+    output_image = np.zeros((h+1,w+1,3))   
+
+    for counter in range(len(Sets3DRGB)):
+        print("...Projecting point cloud into image plane...")
+
+        # clear drawing area of current layer
+        canvas = np.zeros((bot,right,3))
+
+        # segregate 3D points from color
+        dataset = Sets3DRGB[counter]
+        P3D = dataset[:3,:]
+        color = (dataset[3:6,:]).T
+        
+        # form homogeneous 3D points (4xN)
+        len_P = len(P3D[1])
+        ones = np.ones((1,len_P))
+        X = np.concatenate((P3D, ones))
+
+        # apply (3x4) projection matrix
+        x = np.matmul(M,X)
+        # normalize by 3rd homogeneous coordinate
+        x = np.around(np.divide(x, np.array([x[2,:],x[2,:],x[2,:]])))
+
+        # truncate image coordinates
+        x[:2,:] = np.floor(x[:2,:])
+
+        # determine indices to image points within crop area
+        i1 = x[1,:] > top
+        i2 = x[0,:] > left
+        i3 = x[1,:] < bot
+        i4 = x[0,:] < right
+        ix = np.logical_and(i1, np.logical_and(i2, np.logical_and(i3, i4)))
+
+        # make reduced copies of image points and cooresponding color
+        rx = x[:,ix]
+        rcolor = color[ix,:]
+
+        for i in range(len(rx[0])):
+            canvas[int(rx[1,i]),int(rx[0,i]),:] = rcolor[i,:]
+
+        # crop canvas to desired output size
+        cropped_canvas = canvas[top:top+h+1,left:left+w+1]
+
+        # filter individual color channels
+        shape = cropped_canvas.shape
+        filtered_cropped_canvas = np.zeros(shape)
+        print("...Running 2D filters...")
+        for i in range(3):
+            # max filter
+            filtered_cropped_canvas[:,:,i] = maxfilt(cropped_canvas[:,:,i],5)
+
+        
+        # get indices of pixel drawn in the current canvas
+        drawn_pixels = np.sum(filtered_cropped_canvas,2)
+        idx = drawn_pixels != 0
+        shape = idx.shape
+        shape = (shape[0],shape[1],3)
+        idxx = np.zeros(shape,dtype=bool)
+
+        # make a 3-channel copy of the indices
+        idxx[:,:,0] = idx
+        idxx[:,:,1] = idx
+        idxx[:,:,2] = idx
+
+        # erase canvas drawn pixels from the output image
+        output_image[idxx] = 0
+
+        #sum current canvas on top of output image
+        output_image = output_image + filtered_cropped_canvas
+
+    print("Done")
+    return output_image
+
+
+
+# Sample use of PointCloud2Image(...)
+# The following variables are contained in the provided data file:
+#       BackgroundPointCloudRGB,ForegroundPointCloudRGB,K,crop_region,filter_size
+# None of these variables needs to be modified
+
+# load variables: BackgroundPointCloudRGB,ForegroundPointCloudRGB,K,crop_region,filter_size)
+def SampleCameraPath():
+    # load object file to retrieve data
+    file_p = open("data.obj",'rb')
+    camera_objs = pickle.load(file_p)
+
+    # extract objects from object array
+    crop_region = camera_objs[0].flatten()
+    filter_size = camera_objs[1].flatten()
+    K = camera_objs[2]
+    ForegroundPointCloudRGB = camera_objs[3]
+    BackgroundPointCloudRGB = camera_objs[4]
+    # create variables for computation
+    data3DC = (BackgroundPointCloudRGB,ForegroundPointCloudRGB)
+    R = np.identity(3)
+
+    
+    move = np.array([0, 0, -0.0192]).reshape((3,1))
+    # move = np.array([0, 0, 0.12]).reshape((3,1))
+
+    # 4 - 1.44 = 2.56
+    z = 2.56
+    zx = K[0,0]/z
+    zy = K[1,1]/z
+
+    for step in range(75):
+        tic = time.time()
+        
+        fname = "SampleOutput{}.jpg".format(step)
+        print("\nGenerating {}".format(fname))
+        t = step*move
+        
+        f = z + t[2]
+        K[0,0] = f*zx
+        K[1,1] = f*zy
+
+        # go forward by 1.44m to get foreground to be 400*640
+        t[2] = t[2] - 1.44
+
+        M = np.matmul(K,(np.hstack((R,t))))
+
+        img = PointCloud2Image(M,data3DC,crop_region,filter_size)
+
+        # Convert image values form (0-1) to (0-255) and cahnge type from float64 to float32
+        img = 255*(np.array(img, dtype=np.float32))
+
+        # convert image from RGB to BGR for OpenCV
+        img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+        # write image to file 'fname'
+        cv2.imwrite(fname,img_bgr)
+
+        toc = time.time()
+        toc = toc-tic
+        print("{0:.4g} s".format(toc))
+
+def main():
+    SampleCameraPath()
+
+if __name__ == "__main__":
+    main()
