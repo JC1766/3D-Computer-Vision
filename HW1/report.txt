@@ -1,4 +1,8 @@
 CS532 Homework 1
+Group Member:
+Jerry Chen
+Qiming Ren
+
 Part 1: Apply Normalized DLT algorithm for homography estimation and use binlinear interpolation for rendering output image.
 
 To start off, we first choose four points on the original baskeball court image to select only the playing court itself, which we know is a rectangle shape.
