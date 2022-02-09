@@ -36,7 +36,6 @@ def PointCloud2Image(M,Sets3DRGB,viewport,filter_size):
 
         # apply (3x4) projection matrix
         x = np.matmul(M,X)
-
         # normalize by 3rd homogeneous coordinate
         x = np.around(np.divide(x, np.array([x[2,:],x[2,:],x[2,:]])))
 
@@ -115,24 +114,33 @@ def SampleCameraPath():
     # create variables for computation
     data3DC = (BackgroundPointCloudRGB,ForegroundPointCloudRGB)
     R = np.identity(3)
-    move = np.array([0, 0, -0.5]).reshape((3,1))
-    # move = np.array([0, 0, -0.25]).reshape((3,1))
 
-    z = 3.4
+    
+    move = np.array([0, 0, -0.0192]).reshape((3,1))
+    # move = np.array([0, 0, 0.12]).reshape((3,1))
+
+    # 4 - 1.44 = 2.56
+    z = 2.56
     zx = K[0,0]/z
     zy = K[1,1]/z
-    for step in range(8):
+
+    for step in range(75):
         tic = time.time()
         
         fname = "SampleOutput{}.jpg".format(step)
         print("\nGenerating {}".format(fname))
         t = step*move
+        
+        # print(t[0],t[1],t[2])
         f = z + t[2]
         K[0,0] = f*zx
         K[1,1] = f*zy
 
+        # go forward by 1.44m to get foreground to be 400*640
+        t[2] = t[2] - 1.44
+
         M = np.matmul(K,(np.hstack((R,t))))
-        print(M)
+        # print(M)
 
         img = PointCloud2Image(M,data3DC,crop_region,filter_size)
 
