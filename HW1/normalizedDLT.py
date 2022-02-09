@@ -7,7 +7,6 @@ from PIL import Image
 def normalize(width,height):
     normMat = np.array([[width+height,0,width/2],[0,width+height,height/2],[0,0,1]])
     Tn = np.linalg.inv(normMat)
-    # print(Tn)
     return Tn
 
 
@@ -24,7 +23,6 @@ def imageWarp(original, new, H):
             coord = [i,j,1]
             # getting the warped coordinates
             res = np.matmul(H, coord)
-            # print(res)
             # converting homogeneous coordinates back to regular inhomogeneous coords
             x = res[0]/res[2]
             y = res[1]/res[2]
@@ -53,10 +51,7 @@ def imageWarp(original, new, H):
 
 def main():
     image = Image.open("basketball-court.ppm")
-    # image.show()
-    # print(image.size)
     newImg = Image.new(mode = "RGB", size = (940, 500))
-    # newImg.show()
     # [23,193] -> [0,0] 
     # [247,51] -> [939,0] 
     # [402,74] -> [939,499] 
@@ -68,11 +63,8 @@ def main():
 
     # normalize arr2 and arr2
     for i in range(0,4):
-        # print(arr1[i])
         arr1[i] = np.matmul(T1,arr1[i])
         arr2[i] = np.matmul(T2,arr2[i])
-    # print(arr1)
-    # print(arr2)
 
     # compute A matrix
     A = np.zeros((8,9))
@@ -81,19 +73,15 @@ def main():
         it = 2*i
         A[it:it+2] = Ai
         i+=1
-    # print(A)
 
     # compute svd and take smallest eigenvector
     U, D, VT = np.linalg.svd(A)
-    # print(VT)
     H = VT[8]
     # reshape into 3*3 homography matrix
     H = np.reshape(H,(3,3))
-    # print(H)
 
     # Denormalize H 
     H = np.matmul(np.matmul(np.linalg.pinv(T2),H),T1)
-    # print(H)
 
     # we take the inverse homography matrix since we are doing reverse warping
     H = np.linalg.inv(H)
