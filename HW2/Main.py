@@ -86,7 +86,42 @@ def error_rate(image, disp):
     error*=100
     print("Error Rate: "+str(error)+"%")
 
-
+def pkrn_disp(w,h,disp,dict1,dict2,dir):
+    # dir = left for left disparity map
+    # dir = right for right dipsrity map
+    disp_map = np.zeros((w,h))
+    for i in range(0,w):
+        for j in range(0,h):
+            arr1 = dict1[(i,j)]
+            best = getSad(arr1, dict2[(i,j)])
+            best2 = best
+            for d in range(64):
+                jd = j-d
+                if(dir == 'right'):
+                    jd = j+d
+                if(jd>=0 and jd<h):
+                    arr2 = dict2[(i,jd)]
+                    sad = getSad(arr1,arr2)
+                    if(sad < best):
+                        # disp_map[i][j] = abs(d)
+                        best2 = best
+                        best = sad
+                    if(sad < best2 and sad > best):
+                        best2 = sad
+            if(best != 0):
+                # print(best2/best)
+                disp_map[i][j] = (best2/best)*4
+            else:
+                disp_map[i][j] = 256
+    # print(disp_map)
+    med = np.median(disp_map)
+    # sparse_map = np.zeros((w,h))
+    for i in range(0,w):
+        for j in range(0,h):
+            if(disp_map[i][j] < med):
+                disp[i][j] = 0
+                        
+    return disp
 
 def main():
     image1 = Image.open("disp2.pgm")
@@ -102,36 +137,45 @@ def main():
     l_rank = rank_transform(np.array(left),5)
     r_rank = rank_transform(np.array(right),5)
     print("Finished Rank Transform")
-    # left_map = disparity(l_rank,r_rank,3)
-    # dm1 = Image.fromarray(left_map)
-    # dm1.show()
-    print("Starting Disparity Map...")
+
+    print("Starting 3*3 Disparity Map...")
     ldict = disp_dict(l_rank,3)
     rdict = disp_dict(r_rank,3)
 
-    ldict2 = disp_dict(l_rank,15)
-    rdict2 = disp_dict(r_rank,15)
-    
-
     ldisp = disp(w,h,ldict,rdict,'left')
-    rdisp = disp(w,h,ldict,rdict,'right')
-    print("Finished Disparity Map")
+    rdisp = disp(w,h,rdict,ldict,'right')
     dm1 = Image.fromarray(ldisp)
     dm1.show()
     dm2 = Image.fromarray(rdisp)
     dm2.show()
-    e1 = error_rate(image1,dm1)
-    e2 = error_rate(image1,dm2)
+    error_rate(image1,dm1)
+    error_rate(image1,dm2)
+    print("Finished 3*3 Disparity Map")
+
+    print("Starting 15*15 Disparity Map...")
+    ldict2 = disp_dict(l_rank,15)
+    rdict2 = disp_dict(r_rank,15)
 
     ldisp2 = disp(w,h,ldict2,rdict2,'left')
-    rdisp2 = disp(w,h,ldict2,rdict2,'right')
-    print("Finished Disparity Map")
+    rdisp2 = disp(w,h,rdict2,ldict2,'right')
     dm3 = Image.fromarray(ldisp2)
     dm3.show()
     dm4 = Image.fromarray(rdisp2)
     dm4.show()
-    e3 = error_rate(image1,dm3)
-    e4 = error_rate(image1,dm4)
+    error_rate(image1,dm3)
+    error_rate(image1,dm4)
+    print("Finished 15*15 Disparity Map")
+
+    print("Starting PKRN Disparity Map...")
+    pkrn_ldisp = pkrn_disp(w,h,ldisp2,ldict,rdict,'left')
+    pkrn_dm1 = Image.fromarray(pkrn_ldisp)
+    pkrn_dm1.show()
+    error_rate(image1,pkrn_dm1)
+    pkrn_rdisp = pkrn_disp(w,h,rdisp2,rdict,ldict,'right')
+    pkrn_dm2 = Image.fromarray(pkrn_rdisp)
+    pkrn_dm2.show()
+    error_rate(image1,pkrn_dm2)
+    print("Finished PKRN Disparity Map")
 
 if __name__ == "__main__":
     main()
