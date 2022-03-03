@@ -116,11 +116,14 @@ def pkrn_disp(w,h,disp,dict1,dict2,dir):
     # print(disp_map)
     med = np.median(disp_map)
     # sparse_map = np.zeros((w,h))
+    count = 0
     for i in range(0,w):
         for j in range(0,h):
             if(disp_map[i][j] < med):
                 disp[i][j] = 0
-                        
+            else: 
+                count+=1
+    print("Pixels kept: ",count)  
     return disp
 
 def main():
