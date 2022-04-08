@@ -1,3 +1,4 @@
+
 import numpy as np
 import sys
 import cv2
@@ -39,6 +40,9 @@ volume = x_range*y_range*z_range
 vox_num = 1000
 vox_size = np.power((volume/vox_num),1/3)
 vox_grid = []
+flag = 0
+vox_mat = []
+color_mat = []
 
 
 for x in np.arange(-2.5, 2.5, vox_size):
@@ -56,4 +60,25 @@ for x in np.arange(-2.5, 2.5, vox_size):
             # if point is in the silhouette for all 8 views, mark as occupied
             if(np.sum(pass_mat) == 8):
                 vox_grid.append([x,y,z])
+
+
+                r = (c_mat[int(point[1]),int(point[0]),0,7])
+                g = (c_mat[int(point[1]), int(point[0]), 1, 7])
+                b = (c_mat[int(point[1]), int(point[0]), 2, 7])
+                color_mat.append([r,g,b])
+
+            if(flag == 0):
+                vox_mat.append([x,y,z])
+                flag+=1
+                p_vec = [x,y,z]
+                continue
+            if(p_vec[0]==x and p_vec[1] ==y):
+                flag+=1
+
+
+
+
 print(vox_grid)
+print(color_mat)
+print(vox_mat)
+print(p_vec)
