@@ -31,18 +31,29 @@ for i in range(8):
     c_mat[:,:,:,i] = c_dict[i]
     s_mat[:,:,i] = s_dict[i]
     p_mat[:,:,i] = np.reshape(P[i],(3,4))
-print(p_mat[:,:,0])
+print(s_mat[:,:,0].shape,s_mat[:,:,1])
 x_range = 5
 y_range = 6
 z_range = 2.5
 volume = x_range*y_range*z_range
 vox_num = 1000
 vox_size = np.power((volume/vox_num),1/3)
+vox_grid = []
 
 
 for x in np.arange(-2.5, 2.5, vox_size):
     for y in np.arange(-3, 3, vox_size):
         for z in np.arange(0, 2.5, vox_size):
-            coord = [x, y, z, 1]
+            pass_mat = np.zeros(8)
+            coord = [[x, y, z, 1]]
             for i in range(8):
-                point = coord*p_mat[:,:,i]
+                point = np.dot(p_mat[:,:,i],np.transpose(coord))
+                point = point/point[2]
+                # print(point)
+                # check if point is within bounds
+                if((0<=point[1]<582) and (0<=point[0]<780)):
+                    pass_mat[i] = s_mat[int(point[1]),int(point[0]),i]
+            # if point is in the silhouette for all 8 views, mark as occupied
+            if(np.sum(pass_mat) == 8):
+                vox_grid.append([x,y,z])
+print(vox_grid)
