@@ -1,4 +1,3 @@
-
 import numpy as np
 import sys
 import cv2
@@ -7,6 +6,7 @@ import pickle
 import time
 from scipy.signal import medfilt
 from scipy.ndimage.filters import maximum_filter as maxfilt
+import open3d as o3d
 
 P = np.array([[776.649963,-298.408539,-32.048386,993.1581875,132.852554,120.885834,-759.210876,1982.174000,0.744869,0.662592,-0.078377,4.629312012],
     [431.503540,586.251892,-137.094040,1982.053375,23.799522,1.964373,-657.832764,1725.253500,-0.321776,0.869462,-0.374826,5.538025391],
@@ -23,7 +23,7 @@ for i in range(8):
     c_dict[i] = Image.open("cam0" + str(i) + "_00023_0000008550.png")
     s_dict[i] = Image.open("silh_cam0" + str(i) + "_00023_0000008550.pbm")
 
-print(c_dict[0].size,s_dict[1].size)
+# print(c_dict[0].size,s_dict[1].size)
 # height, width, rgb values, image number
 c_mat = np.zeros((582,780,3,8))
 s_mat = np.zeros((582,780,8))
@@ -32,53 +32,34 @@ for i in range(8):
     c_mat[:,:,:,i] = c_dict[i]
     s_mat[:,:,i] = s_dict[i]
     p_mat[:,:,i] = np.reshape(P[i],(3,4))
-print(s_mat[:,:,0].shape,s_mat[:,:,1])
+# print(s_mat[:,:,0].shape,s_mat[:,:,1])
 x_range = 5
 y_range = 6
 z_range = 2.5
 volume = x_range*y_range*z_range
-vox_num = 1000
+vox_num = 1000000
 vox_size = np.power((volume/vox_num),1/3)
 vox_grid = []
-flag = 0
-vox_mat = []
-color_mat = []
-
 
 for x in np.arange(-2.5, 2.5, vox_size):
     for y in np.arange(-3, 3, vox_size):
         for z in np.arange(0, 2.5, vox_size):
             pass_mat = np.zeros(8)
-            coord = [[x, y, z, 1]]
+            coord = [x, y, z, 1]
             for i in range(8):
-                point = np.dot(p_mat[:,:,i],np.transpose(coord))
-                point = point/point[2]
+                # point = np.dot(p_mat[:,:,i],np.transpose(coord))
+                point = np.dot(coord,np.transpose(p_mat[:,:,i]))
                 # print(point)
+                point = point/point[2]
                 # check if point is within bounds
                 if((0<=point[1]<582) and (0<=point[0]<780)):
                     pass_mat[i] = s_mat[int(point[1]),int(point[0]),i]
             # if point is in the silhouette for all 8 views, mark as occupied
-            if(np.sum(pass_mat) == 8):
+            if(np.sum(pass_mat) >= 8):
                 vox_grid.append([x,y,z])
-
-
-                r = (c_mat[int(point[1]),int(point[0]),0,7])
-                g = (c_mat[int(point[1]), int(point[0]), 1, 7])
-                b = (c_mat[int(point[1]), int(point[0]), 2, 7])
-                color_mat.append([r,g,b])
-
-            if(flag == 0):
-                vox_mat.append([x,y,z])
-                flag+=1
-                p_vec = [x,y,z]
-                continue
-            if(p_vec[0]==x and p_vec[1] ==y):
-                flag+=1
-
-
-
-
 print(vox_grid)
-print(color_mat)
-print(vox_mat)
-print(p_vec)
+xyz = np.random.rand(100, 3)
+pcd = o3d.geometry.PointCloud()
+pcd.points = o3d.utility.Vector3dVector(vox_grid)
+o3d.io.write_point_cloud("./data.ply", pcd)
+o3d.visualization.draw_geometries([pcd])
