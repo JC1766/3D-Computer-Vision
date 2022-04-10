@@ -20,29 +20,32 @@ P = np.array([[776.649963,-298.408539,-32.048386,993.1581875,132.852554,120.8858
 c_dict = {}
 s_dict = {}
 for i in range(8):
-    c_dict[i] = Image.open("cam0" + str(i) + "_00023_0000008550.png")
-    s_dict[i] = Image.open("silh_cam0" + str(i) + "_00023_0000008550.pbm")
+    c_dict[i] = np.asarray(Image.open("cam0" + str(i) + "_00023_0000008550.png"))
+    s_dict[i] = np.asarray(Image.open("silh_cam0" + str(i) + "_00023_0000008550.pbm"))
 
 # print(c_dict[0].size,s_dict[1].size)
 # height, width, rgb values, image number
-c_mat = np.zeros((582,780,3,8))
-s_mat = np.zeros((582,780,8))
+# c_mat = np.zeros((582,780,3,8))
+# s_mat = np.zeros((582,780,8))
 p_mat = np.zeros((3,4,8))
 for i in range(8):
-    c_mat[:,:,:,i] = c_dict[i]
-    s_mat[:,:,i] = s_dict[i]
     p_mat[:,:,i] = np.reshape(P[i],(3,4))
 # print(s_mat[:,:,0].shape,s_mat[:,:,1])
+        
 x_range = 5
 y_range = 6
 z_range = 2.5
 volume = x_range*y_range*z_range
-vox_num = 1000000
+vox_num = 100000
 vox_size = np.power((volume/vox_num),1/3)
 vox_grid = []
+# rvox_grid = []
+surf_grid = []
 
 for x in np.arange(-2.5, 2.5, vox_size):
     for y in np.arange(-3, 3, vox_size):
+        minz = 3
+        maxz = -3
         for z in np.arange(0, 2.5, vox_size):
             pass_mat = np.zeros(8)
             coord = [x, y, z, 1]
@@ -53,13 +56,77 @@ for x in np.arange(-2.5, 2.5, vox_size):
                 point = point/point[2]
                 # check if point is within bounds
                 if((0<=point[1]<582) and (0<=point[0]<780)):
-                    pass_mat[i] = s_mat[int(point[1]),int(point[0]),i]
+                    # pass_mat[i] = s_mat[int(point[1]),int(point[0]),i]
+                    pass_mat[i] = s_dict[i][int(point[1]),int(point[0])]
             # if point is in the silhouette for all 8 views, mark as occupied
-            if(np.sum(pass_mat) >= 8):
+            if(np.sum(pass_mat) == 8):
                 vox_grid.append([x,y,z])
-print(vox_grid)
-xyz = np.random.rand(100, 3)
+                # rvox_grid.append([float(str(x)[0:10]),float(str(y)[0:10]),float(str(z)[0:10])])
+                if(z<minz):
+                    minz = z
+                if(z>maxz):
+                    maxz = z
+        if(minz!=3 and maxz!=-3):
+            surf_grid.append([x,y,minz])
+            surf_grid.append([x,y,maxz])
+def clear_grid(vox,surf):
+    for s in surf:
+        if(s in vox):
+            vox.remove(s)
+clear_grid(vox_grid,surf_grid)
+for z in np.arange(0, 2.5, vox_size):
+    for y in np.arange(-3, 3, vox_size):
+        minx = 3
+        maxx = -3
+        for x in np.arange(-2.5, 2.5, vox_size):
+            if([x,y,z] in vox_grid):
+                if(x<minx):
+                    minx = x
+                if(x>maxx):
+                    maxx = x
+        if(minx!=3 and maxx!=-3):
+            surf_grid.append([minx,y,z])
+            surf_grid.append([maxx,y,z])
+clear_grid(vox_grid,surf_grid)
+for z in np.arange(0, 2.5, vox_size):
+    for x in np.arange(-2.5, 2.5, vox_size):
+        miny = 3
+        maxy = -3
+        for y in np.arange(-3, 3, vox_size):
+            if([x,y,z] in vox_grid):
+                if(y<miny):
+                    miny = y
+                if(y>maxy):
+                    maxy = y
+        if(minz!=3 and maxz!=-3):
+            surf_grid.append([x,miny,z])
+            surf_grid.append([x,maxy,z])
+
+# def surf(vox,rvox_grid,vox_size):
+#     [x,y,z] = vox
+#     y = float(str(y)[0:10])
+#     z = float(str(z)[0:10])
+#     check = [[float(str(x-vox_size)[0:10]),y,z],[float(str(x+vox_size)[0:10]),y,z],
+#     [x,float(str(y-vox_size)[0:10]),z],[x,float(str(y+vox_size)[0:10]),z],
+#     [x,y,float(str(z-vox_size)[0:10])],[x,y,float(str(z+vox_size)[0:10])]]
+#     count = 0
+#     for c in check:
+#         if(not(c in rvox_grid)):
+#             count+=1
+#     # print(check)
+#     return True if count < 4 else False
+# for vox in vox_grid:
+#     if(surf(vox,rvox_grid,vox_size)):
+#         surf_grid.append(vox)
+
+
+print(vox_size,len(vox_grid),len(surf_grid))
+
 pcd = o3d.geometry.PointCloud()
-pcd.points = o3d.utility.Vector3dVector(vox_grid)
-o3d.io.write_point_cloud("./data.ply", pcd)
+# pcd.points = o3d.utility.Vector3dVector(vox_grid)
+# o3d.io.write_point_cloud("./data.ply", pcd)
+# o3d.visualization.draw_geometries([pcd])
+
+pcd.points = o3d.utility.Vector3dVector(surf_grid)
+o3d.io.write_point_cloud("./surf.ply", pcd)
 o3d.visualization.draw_geometries([pcd])
