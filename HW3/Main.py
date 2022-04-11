@@ -23,7 +23,7 @@ x_range = 5
 y_range = 6
 z_range = 2.5
 volume = x_range*y_range*z_range
-vox_num = 10000000
+vox_num = 1000000
 vox_size = np.power((volume/vox_num),1/3)
 vox_grid = []
 # rvox_grid = []
@@ -153,10 +153,6 @@ for i in range(0,len(d_grid)):
 
 print(vox_size,len(color_grid),len(surf_grid))
 pcd = o3d.geometry.PointCloud()
-
-# pcd.points = o3d.utility.Vector3dVector(vox_grid)
-# o3d.io.write_point_cloud("./data.ply", pcd)
-# o3d.visualization.draw_geometries([pcd])
 
 pcd.points = o3d.utility.Vector3dVector(surf_grid)
 pcd.colors = o3d.utility.Vector3dVector(color_grid)
